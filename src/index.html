@@ -55,7 +55,7 @@
     baseUrl: "https://dev-616126.okta.com",
     clientId: "0oa4lg5xx9tpi8R7O4x6",
     authParams: {
-      issuer: "https://dev-616126.okta.com/oauth2/default",
+      issuer: "https://dev-616126.okta.com/oauth2/default",	  
       responseType: ["token", "id_token"],
       display: "page"
     }
@@ -68,38 +68,73 @@
     });
   }
 
-  // Handle the user's login and what happens next.
-  function handleLogin() {
-    // If the user is logging in for the first time...
-    if (okta.token.hasTokensInUrl()) {
-      okta.token.parseTokensFromUrl(
-        function success(res) {
-          // Save the tokens for later use, e.g. if the page gets refreshed:
-          okta.tokenManager.add("accessToken", res[0]);
-          okta.tokenManager.add("idToken", res[1]);
+ // Handle the user's login and what happens next.
+function handleLogin() {
+  // If the user is logging in for the first time...
+  if (okta.token.hasTokensInUrl()) {
+    okta.token.parseTokensFromUrl(
+      function success(res) {
+        // Save the tokens for later use, e.g. if the page gets refreshed:
+        okta.tokenManager.add("accessToken", res[0]);
+        okta.tokenManager.add("idToken", res[1]);
 
-          console.log("user just logged in");
-        }, function error(err) {
-          alert("We weren't able to log you in, something horrible must have happened. Please refresh the page.");
+        // Redirect to this user's dedicated room URL.
+        window.location = getRoomURL();
+      }, function error(err) {
+        alert("We weren't able to log you in, something horrible must have happened. Please refresh the page.");
+      }
+    );
+  } else {
+    okta.session.get(function(res) {
+
+      // If the user is logged in...
+      if (res.status === "ACTIVE") {
+
+        // If the user is logged in on the home page, redirect to their room page.
+        if (!hasQueryString()) {
+          window.location = getRoomURL();
         }
-      );
-    } else {
-      okta.session.get(function(res) {
 
-        // If the user is logged in...
-        if (res.status === "ACTIVE") {
+        return;
+      }
 
-          console.log("user is already logged in")
-          return;
-        }
+      // If we get here, the user is not logged in.
 
-        // If we get here, the user is not logged in.
-        console.log("user not logged in");
+      // If there's a querystring in the URL, it means this person is in a
+      // "room" so we should display our passive login notice. Otherwise,
+      // we'll prompt them for login immediately.
+      if (hasQueryString()) {
+        document.getElementById("login").style.display = "block";
+      } else {
         showLogin();
-      });
-    }
+      }
+    });
   }
+}
+// Determine whether or not we have a querystring.
+function hasQueryString() {
+  return location.href.indexOf("?") !== -1;
+}
+
+// Determine the room name and public URL for this chat session.
+function getRoom() {
+  var query = location.search && location.search.split("?")[1];
+
+  if (query) {
+    return (location.search && decodeURIComponent(query.split("=")[1]));
+  }
+
+  return okta.tokenManager.get("idToken").claims.email;
+}
+
+// Retrieve the absolute room URL.
+function getRoomURL() {
+  return location.protocol + "//" + location.host + (location.path || "") + "?room=" + getRoom();
+}
 
   handleLogin();
 </script>
+<p id="login">
+  <b>NOTE</b>: You are not currently logged in. If you'd like to start your own chat room please <button type="button" class="btn btn-light" onclick="document.location='/'">log in</button>
+</p>
 </html>
